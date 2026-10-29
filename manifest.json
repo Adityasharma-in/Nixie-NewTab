@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Nixie New Tab",
+  "version": "1.3.0",
+  "description": "A nixie-tube laboratory instrument as your new tab — live clock, machined keys for favorite sites, a trip-computer Google search, a persistent timer alarm, and live Brave Shields telemetry.",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": ["storage", "favicon", "alarms", "offscreen"],
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "host_permissions": ["https://suggestqueries.google.com/*", "file:///*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

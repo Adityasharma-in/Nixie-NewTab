@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>New Tab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nameplate-row">
+  <div class="nameplate">NIXIE<span class="np-div"></span><span class="np-sub">NEW TAB</span></div>
+  <div class="header-tools">
+    <div class="status-chip" id="statusChip" title="System status">
+      <i class="led" id="statusLed" aria-hidden="true"></i>
+      <span id="statusText">SYSTEM NOMINAL</span>
+    </div>
+    <span class="visually-hidden" id="statusAnnounce" role="status" aria-live="polite"></span>
+    <button type="button" class="cal-open console-open" id="openConsole"
+      aria-label="Open command console" aria-haspopup="dialog" aria-controls="consoleDialog"
+      aria-keyshortcuts="Control+K Meta+K"
+      title="Console — press Ctrl or Cmd + K, or colon">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 4.2 6.8 8 3 11.8M8.4 12h4.6" stroke="currentColor"
+          stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button type="button" class="cal-open" id="openCalibration"
+      aria-label="Open calibration settings" aria-haspopup="dialog" aria-controls="calibrationDialog"
+      aria-keyshortcuts="Comma"
+      title="Calibration — press comma">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="2.15" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M8 1.7v1.6M8 12.7v1.6M1.7 8h1.6M12.7 8h1.6M3.55 3.55l1.13 1.13M11.32 11.32l1.13 1.13M12.45 3.55l-1.13 1.13M4.68 11.32l-1.13 1.13"
+          stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="deck">
+  <section class="deck-plate" aria-label="Local time">
+    <div class="screws" aria-hidden="true"></div>
+    <div class="tube-bank" id="tubeBank"></div>
+  </section>
+
+  <div class="date-plate" id="datePlate">
+    <div class="date-cluster">
+      <span class="date-readout" id="dateReadout">—</span>
+      <button type="button" class="tminus-readout" id="tminusReadout" hidden
+        aria-haspopup="dialog" aria-controls="calibrationDialog"
+        title="Manage countdowns">
+        <span class="tminus-code" id="tminusCode"></span>
+        <span class="tminus-label" id="tminusLabel"></span>
+      </button>
+    </div>
+
+    <div class="telemetry" id="telemetry" role="group" aria-label="Brave Shields telemetry">
+      <button type="button" class="telemetry-link" id="telemetryLink"
+        aria-haspopup="dialog" aria-controls="calibrationDialog"
+        title="Brave Shields telemetry — click to configure">
+        <i class="telemetry-lamp" id="telemetryLamp" aria-hidden="true"></i>
+        <span class="telemetry-name">SHIELDS</span>
+        <span class="telemetry-state" id="telemetryState">LINKING</span>
+      </button>
+      <div class="telemetry-stats">
+        <div class="telemetry-stat" title="Trackers and ads blocked by Brave Shields">
+          <span class="telemetry-value"><span class="telemetry-num" id="statBlocked">—</span></span>
+          <span class="telemetry-label">TRACKERS &amp; ADS BLOCKED</span>
+        </div>
+        <span class="telemetry-div" aria-hidden="true"></span>
+        <div class="telemetry-stat" title="Estimated bandwidth saved by Brave Shields">
+          <span class="telemetry-value"><span class="telemetry-num" id="statBandwidth">—</span><span class="telemetry-unit" id="statBandwidthUnit"></span></span>
+          <span class="telemetry-label">BANDWIDTH SAVED</span>
+        </div>
+        <span class="telemetry-div" aria-hidden="true"></span>
+        <div class="telemetry-stat" title="Estimated time saved by Brave Shields">
+          <span class="telemetry-value"><span class="telemetry-num" id="statTime">—</span><span class="telemetry-unit" id="statTimeUnit"></span></span>
+          <span class="telemetry-label">TIME SAVED</span>
+        </div>
+      </div>
+      <span class="visually-hidden" id="telemetryAnnounce" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <div class="mode-switch" role="group" aria-label="Tube mode">
+    <button type="button" class="mode-btn is-active" data-mode="clock" aria-pressed="true">CLOCK</button>
+    <span class="mode-div" aria-hidden="true"></span>
+    <button type="button" class="mode-btn" data-mode="timer" aria-pressed="false">
+      <i class="mode-live" aria-hidden="true"></i><span>TIMER</span><span class="mode-count" id="countTimer" hidden></span>
+    </button>
+    <span class="mode-div" aria-hidden="true"></span>
+    <button type="button" class="mode-btn" data-mode="focus" aria-pressed="false">
+      <i class="mode-live" aria-hidden="true"></i><span>FOCUS 25</span><span class="mode-count" id="countFocus" hidden></span>
+    </button>
+  </div>
+
+  <section class="timer-panel" id="timerPanel" aria-label="Timer controls" hidden>
+    <div class="timer-inner">
+      <div class="timer-inputs" id="timerInputs">
+        <div class="t-field">
+          <label class="sp-label" for="inH">HH</label>
+          <input class="sp-input t-input" id="inH" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="2" value="00">
+        </div>
+        <span class="t-colon" aria-hidden="true">:</span>
+        <div class="t-field">
+          <label class="sp-label" for="inM">MM</label>
+          <input class="sp-input t-input" id="inM" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="2" value="05">
+        </div>
+        <span class="t-colon" aria-hidden="true">:</span>
+        <div class="t-field">
+          <label class="sp-label" for="inS">SS</label>
+          <input class="sp-input t-input" id="inS" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="2" value="00">
+        </div>
+      </div>
+      <p class="focus-preset" id="focusPreset" hidden>25 MIN FOCUS</p>
+      <div class="timer-actions">
+        <button type="button" class="sp-btn sp-primary" id="timerToggle">START</button>
+        <button type="button" class="sp-btn" id="timerReset">RESET</button>
+      </div>
+      <span class="timer-readout" id="timerReadout" role="timer">READY</span>
+    </div>
+  </section>
+
+  <section class="console-rail" id="rail" aria-label="Favorite sites">
+    <p class="rail-empty" id="railEmpty" hidden>NO KEYS COMMISSIONED — ADD A FREQUENT SITE</p>
+    <div class="keys" id="keys"></div>
+    <button type="button" class="edit-toggle" id="editToggle" aria-pressed="false">
+      <i class="et-lamp" aria-hidden="true"></i><span class="et-text">EDIT KEYS</span>
+    </button>
+  </section>
+
+  <section class="service-panel" id="servicePanel" aria-label="Add a site">
+    <form id="addForm" novalidate>
+      <div class="sp-inner">
+        <div class="sp-field">
+          <label class="sp-label" for="siteName">NAME</label>
+          <input class="sp-input" id="siteName" type="text" autocomplete="off" spellcheck="false" placeholder="GitHub">
+        </div>
+        <div class="sp-field sp-field-url">
+          <label class="sp-label" for="siteUrl">URL</label>
+          <input class="sp-input" id="siteUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+            aria-describedby="siteError" placeholder="github.com">
+          <p class="sp-error" id="siteError" role="alert" hidden>ENTER A VALID URL</p>
+        </div>
+        <div class="sp-actions">
+          <button type="submit" class="sp-btn sp-primary">COMMISSION KEY</button>
+          <button type="button" class="sp-btn" id="cancelAdd">CANCEL</button>
+        </div>
+      </div>
+    </form>
+  </section>
+</main>
+
+<section class="alarm-strip" id="alarmStrip" role="alert" hidden>
+  <span class="alarm-lamp" aria-hidden="true"></span>
+  <span class="alarm-text" id="alarmText">TIMER COMPLETE — SILENCE TO ACKNOWLEDGE</span>
+  <button type="button" class="sp-btn sp-primary alarm-silence" id="alarmSilence">SILENCE</button>
+</section>
+
+<footer class="dock">
+  <div class="search-slot-wrap">
+    <div class="suggest-stack" id="suggestStack" role="listbox" aria-label="Search suggestions" hidden></div>
+    <form class="search-slot" id="searchForm" autocomplete="off">
+      <svg class="slot-glyph" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <input id="searchInput" type="text" role="combobox" aria-expanded="false"
+        aria-controls="suggestStack" aria-autocomplete="list"
+        autocomplete="off" spellcheck="false"
+        placeholder="Search Google" aria-label="Search Google">
+      <kbd class="slot-hint" aria-hidden="true">&#8629;</kbd>
+    </form>
+  </div>
+</footer>
+
+<div class="readout-toast" id="toast" role="status" hidden>
+  <span class="toast-text" id="toastText"></span>
+  <button type="button" class="toast-undo" id="toastUndo" hidden>UNDO</button>
+</div>
+
+<aside class="task-module" id="taskModule" aria-label="Work order manifest">
+  <button type="button" class="tm-head" id="taskToggle" aria-expanded="false"
+    aria-controls="taskBody" aria-keyshortcuts="T"
+    title="Toggle task manifest — press T">
+    <i class="tm-lamp" aria-hidden="true"></i>
+    <span class="tm-title">MANIFEST</span>
+    <span class="tm-serial" aria-hidden="true">MF-01</span>
+    <span class="tm-count" id="manifestCount">00 OPEN</span>
+    <span class="tm-chev" aria-hidden="true">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M2.2 3.8 5 6.6l2.8-2.8" stroke="currentColor" stroke-width="1.3"
+          stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+  </button>
+
+  <section class="tm-gauge" id="manifestGauge" role="progressbar"
+    aria-label="Work order completion" aria-valuemin="0" aria-valuemax="100"
+    aria-valuenow="0" aria-valuetext="No work orders">
+    <div class="tm-gauge-head">
+      <span class="tm-gauge-label">WORK ORDER STATUS</span>
+      <span class="tm-pct" id="manifestPct">0%</span>
+    </div>
+    <div class="tm-meter" aria-hidden="true"><i id="manifestBar"></i></div>
+  </section>
+
+  <p class="tm-next" id="manifestNext">NO WORK ORDERS LOGGED — PRESS T TO ADD</p>
+
+  <div class="tm-body" id="taskBody" inert>
+    <div class="tm-body-inner">
+      <form class="tm-add" id="taskForm" novalidate>
+        <label class="visually-hidden" for="taskInput">New work order</label>
+        <input class="tm-input" id="taskInput" type="text" autocomplete="off"
+          spellcheck="true" maxlength="200" placeholder="NEW WORK ORDER"
+          aria-describedby="taskError">
+        <button type="submit" class="sp-btn sp-primary tm-add-btn">ADD</button>
+      </form>
+      <p class="tm-error" id="taskError" role="alert" hidden>ENTER A WORK ORDER</p>
+
+      <div class="tm-toolbar">
+        <div class="tm-filters" id="manifestFilters" role="group" aria-label="Filter work orders">
+          <button type="button" class="mf-btn is-active" data-filter="all" aria-pressed="true">ALL <span class="mf-count">00</span></button>
+          <button type="button" class="mf-btn" data-filter="open" aria-pressed="false">OPEN <span class="mf-count">00</span></button>
+          <button type="button" class="mf-btn" data-filter="done" aria-pressed="false">DONE <span class="mf-count">00</span></button>
+        </div>
+        <button type="button" class="tm-clear" id="clearDone" disabled
+          title="Clear completed work orders">CLEAR DONE</button>
+      </div>
+
+      <div class="tm-list-wrap">
+        <ul class="tm-list" id="taskList" aria-label="Work orders"></ul>
+        <div class="tm-empty" id="taskEmpty">
+          <span class="tm-empty-code" id="taskEmptyCode" aria-hidden="true">00</span>
+          <p class="tm-empty-title" id="taskEmptyTitle">NO WORK ORDERS ON FILE</p>
+          <p class="tm-empty-sub" id="taskEmptySub">Log one above to commission the manifest.</p>
+        </div>
+      </div>
+      <p class="visually-hidden" id="taskAnnounce" aria-live="polite"></p>
+    </div>
+  </div>
+</aside>
+
+<div class="manifest-scrim" id="manifestScrim" aria-hidden="true"></div>
+
+<dialog class="cal-dialog" id="calibrationDialog" aria-labelledby="calTitle">
+  <div class="cal-shell">
+    <header class="cal-head">
+      <div class="cal-head-copy">
+        <span class="cal-kicker">NIXIE / CALIBRATION</span>
+        <h2 class="cal-title" id="calTitle">INSTRUMENT SETTINGS</h2>
+      </div>
+      <button type="button" class="cal-close" id="calClose" aria-label="Close calibration">×</button>
+    </header>
+
+    <div class="cal-body">
+      <section class="cal-section" data-cal-section="time">
+        <h3 class="cal-section-title">TIME &amp; DISPLAY</h3>
+
+        <label class="cal-row">
+          <span class="cal-copy">
+            <span class="cal-row-title">24-HOUR CLOCK</span>
+            <span class="cal-row-sub">Show 13:00 instead of 1 PM</span>
+          </span>
+          <input type="checkbox" class="cal-switch" id="setClock24">
+        </label>
+
+        <label class="cal-row">
+          <span class="cal-copy">
+            <span class="cal-row-title">SHOW SECONDS</span>
+            <span class="cal-row-sub">Hide the third tube pair for a calmer clock</span>
+          </span>
+          <input type="checkbox" class="cal-switch" id="setSeconds">
+        </label>
+
+        <div class="cal-field">
+          <label class="cal-label" for="setTheme">TUBE COLOUR</label>
+          <select class="cal-select" id="setTheme"></select>
+        </div>
+
+        <label class="cal-row">
+          <span class="cal-copy">
+            <span class="cal-row-title">DIM CHASSIS</span>
+            <span class="cal-row-sub">Lower the whole panel for night work</span>
+          </span>
+          <input type="checkbox" class="cal-switch" id="setDim">
+        </label>
+      </section>
+
+      <section class="cal-section" data-cal-section="alarm">
+        <h3 class="cal-section-title">ALARM</h3>
+
+        <div class="cal-field">
+          <label class="cal-label" for="setTone">TONE</label>
+          <select class="cal-select" id="setTone"></select>
+        </div>
+
+        <div class="cal-field">
+          <label class="cal-label" for="setVolume">VOLUME <output id="volumeOut" for="setVolume">55%</output></label>
+          <input type="range" class="cal-range" id="setVolume" min="0" max="100" step="1" value="55">
+        </div>
+
+        <button type="button" class="sp-btn cal-wide" id="testAlarm">TEST TONE</button>
+      </section>
+
+      <section class="cal-section" data-cal-section="search">
+        <h3 class="cal-section-title">TRIP COMPUTER</h3>
+
+        <div class="cal-field">
+          <label class="cal-label" for="setEngine">SEARCH ENGINE</label>
+          <select class="cal-select" id="setEngine"></select>
+        </div>
+
+        <label class="cal-row">
+          <span class="cal-copy">
+            <span class="cal-row-title">LIVE SUGGESTIONS</span>
+            <span class="cal-row-sub">Google only — sends typed text to Google</span>
+          </span>
+          <input type="checkbox" class="cal-switch" id="setSuggestions">
+        </label>
+      </section>
+
+      <section class="cal-section" data-cal-section="shields">
+        <h3 class="cal-section-title">BRAVE SHIELDS</h3>
+        <p class="cal-help">Reads the totals Brave already keeps on this machine. Nothing is uploaded, and this path is excluded from archives.</p>
+
+        <label class="cal-row">
+          <span class="cal-copy">
+            <span class="cal-row-title">LIVE TELEMETRY</span>
+            <span class="cal-row-sub">Blocked, bandwidth, and time saved on the date rail</span>
+          </span>
+          <input type="checkbox" class="cal-switch" id="setShields">
+        </label>
+
+        <div class="cal-field">
+          <label class="cal-label" for="setShieldsPath">PREFERENCES FILE</label>
+          <input class="sp-input cal-input cal-input-path" id="setShieldsPath" type="text"
+            autocomplete="off" spellcheck="false"
+            placeholder="C:\Users\YOU\AppData\Local\BraveSoftware\Brave-Browser\User Data\Profile 1\Preferences"
+            aria-describedby="shieldsHelp shieldsStatus">
+          <p class="cal-help cal-help-tight" id="shieldsHelp">Point at Brave’s <code>Preferences</code> file, or at the profile folder that contains it.</p>
+        </div>
+
+        <div class="cal-actions">
+          <button type="button" class="sp-btn" id="detectShields">DETECT</button>
+          <button type="button" class="sp-btn" id="testShields">TEST LINK</button>
+        </div>
+        <p class="cal-shields-status" id="shieldsStatus" role="status">TELEMETRY OFF</p>
+      </section>
+
+      <section class="cal-section" id="calTminusSection" data-cal-section="tminus">
+        <h3 class="cal-section-title">T-MINUS</h3>
+        <p class="cal-help">The nearest upcoming event appears on the date plate.</p>
+
+        <form class="cal-event-form" id="eventForm" novalidate>
+          <div class="cal-event-field cal-event-label">
+            <label class="cal-label" for="eventLabel">LABEL</label>
+            <input class="sp-input cal-input" id="eventLabel" type="text"
+              aria-describedby="eventError"
+              autocomplete="off" spellcheck="false" maxlength="40" placeholder="EXAM">
+          </div>
+          <div class="cal-event-field">
+            <label class="cal-label" for="eventDate">DATE</label>
+            <input class="sp-input cal-input" id="eventDate" type="date"
+              aria-describedby="eventError">
+          </div>
+          <div class="cal-event-field">
+            <label class="cal-label" for="eventTime">TIME <span class="cal-optional">OPTIONAL</span></label>
+            <input class="sp-input cal-input" id="eventTime" type="time"
+              aria-describedby="eventError">
+          </div>
+          <button type="submit" class="sp-btn sp-primary cal-event-add">ADD</button>
+        </form>
+        <p class="cal-error" id="eventError" role="alert" hidden>ENTER A LABEL AND A VALID DATE</p>
+
+        <ul class="cal-event-list" id="eventList"></ul>
+        <p class="cal-empty" id="eventEmpty">NO COUNTDOWNS COMMISSIONED</p>
+        <div class="cal-event-undo" id="eventUndoBar" hidden>
+          <span id="eventUndoText">COUNTDOWN REMOVED</span>
+          <button type="button" class="cal-event-undo-btn" id="eventUndo">UNDO</button>
+        </div>
+      </section>
+
+      <section class="cal-section" data-cal-section="data">
+        <h3 class="cal-section-title">ARCHIVE</h3>
+        <p class="cal-help">Keys, work orders, countdowns, and settings in one JSON file.</p>
+        <div class="cal-actions">
+          <button type="button" class="sp-btn" id="exportData">EXPORT</button>
+          <button type="button" class="sp-btn" id="importData">IMPORT</button>
+          <button type="button" class="sp-btn cal-danger" id="resetData">RESET</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+      </section>
+    </div>
+
+    <footer class="cal-foot">
+      <span class="cal-status" id="calStatus" role="status">CHANGES SAVE AUTOMATICALLY</span>
+      <span class="cal-version">MF-01 / 1.2</span>
+    </footer>
+  </div>
+</dialog>
+
+<dialog class="console-dialog" id="consoleDialog"
+  aria-labelledby="consoleTitle" aria-describedby="consoleHint">
+  <div class="console-shell">
+    <header class="console-head">
+      <span class="console-title" id="consoleTitle">CONSOLE</span>
+      <div class="console-head-tools">
+        <span class="console-shortcut"><kbd>ESC</kbd> CLOSE</span>
+        <button type="button" class="console-close" id="consoleClose"
+          aria-label="Close console">×</button>
+      </div>
+    </header>
+    <div class="console-input-row">
+      <span class="console-prompt" aria-hidden="true">›</span>
+      <input class="console-input" id="consoleInput" type="text"
+        autocomplete="off" spellcheck="false" role="combobox"
+        aria-expanded="true" aria-controls="consoleResults" aria-autocomplete="list"
+        aria-label="Command console" placeholder="TYPE A COMMAND OR CALCULATION">
+    </div>
+    <ul class="console-results" id="consoleResults" role="listbox" aria-label="Console results"></ul>
+    <p class="console-hint" id="consoleHint">TIMER 10 · TASK BUY MILK · THEME GREEN · OPEN GITHUB · 12*8</p>
+    <span class="visually-hidden" id="consoleAnnounce" role="status" aria-live="polite"></span>
+  </div>
+</dialog>
+
+<script src="core.js"></script>
+<script src="newtab.js"></script>
+</body>
+</html>
