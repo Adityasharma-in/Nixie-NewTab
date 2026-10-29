@@ -164,15 +164,27 @@
   <div class="search-slot-wrap">
     <div class="suggest-stack" id="suggestStack" role="listbox" aria-label="Search suggestions" hidden></div>
     <form class="search-slot" id="searchForm" autocomplete="off">
-      <svg class="slot-glyph" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/>
-        <path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-      </svg>
-      <input id="searchInput" type="text" role="combobox" aria-expanded="false"
-        aria-controls="suggestStack" aria-autocomplete="list"
-        autocomplete="off" spellcheck="false"
-        placeholder="Search Google" aria-label="Search Google">
-      <kbd class="slot-hint" aria-hidden="true">&#8629;</kbd>
+      <span class="slot-lens" aria-hidden="true">
+        <svg class="slot-glyph" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="slot-field">
+        <span class="slot-kicker" aria-hidden="true">
+          <span class="slot-kicker-text">SEARCH</span>
+          <span class="slot-kicker-div"></span>
+          <span class="slot-engine" id="searchEngineLabel">GOOGLE</span>
+        </span>
+        <input id="searchInput" type="text" role="combobox" aria-expanded="false"
+          aria-controls="suggestStack" aria-autocomplete="list"
+          autocomplete="off" spellcheck="false"
+          placeholder="Search the web or enter a URL" aria-label="Search Google">
+      </span>
+      <kbd class="slot-hint" aria-hidden="true">
+        <span class="slot-hint-glyph">&#8629;</span>
+        <span class="slot-hint-text">ENTER</span>
+      </kbd>
     </form>
   </div>
 </footer>
@@ -207,8 +219,6 @@
     </div>
     <div class="tm-meter" aria-hidden="true"><i id="manifestBar"></i></div>
   </section>
-
-  <p class="tm-next" id="manifestNext">NO WORK ORDERS LOGGED — PRESS T TO ADD</p>
 
   <div class="tm-body" id="taskBody" inert>
     <div class="tm-body-inner">

@@ -12,7 +12,7 @@
 }(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function () {
   'use strict';
 
-  var VERSION = '1.3.0';
+  var VERSION = '1.3.1';
 
   var SETTINGS_DEFAULTS = {
     clock24: false,
@@ -744,6 +744,75 @@
     return { active: active, lastUsed: lastUsed, order: order };
   }
 
+  /* Chromium writes `last_used` and the winner's `active_time` from the same
+     browser-window activation, so they identify the profile whose window is
+     in use. Shields counters say nothing about that — a profile with a bigger
+     counter may be a different, older profile — so they are never a fallback.
+     Returns null when Local State cannot decide, which callers must treat as
+     "do not show another profile's stats". */
+  function pickBraveProfile(activity, names) {
+    if (!isObject(activity)) return null;
+    var candidates = [];
+    if (Array.isArray(names)) {
+      names.forEach(function (name) {
+        if (typeof name === 'string' && name && candidates.indexOf(name) === -1) {
+          candidates.push(name);
+        }
+      });
+    }
+    if (!candidates.length) return null;
+
+    var active = isObject(activity.active) ? activity.active : {};
+    var bestName = '';
+    var bestTime = 0;
+    var tied = false;
+    candidates.forEach(function (name) {
+      var time = Number(active[name]);
+      if (!Number.isFinite(time) || time <= 0) return;
+      if (time > bestTime) {
+        bestTime = time;
+        bestName = name;
+        tied = false;
+      } else if (time === bestTime) {
+        tied = true;
+      }
+    });
+
+    var lastUsed = typeof activity.lastUsed === 'string' ? activity.lastUsed : '';
+    if (lastUsed && candidates.indexOf(lastUsed) !== -1) {
+      var lastTime = Number(active[lastUsed]);
+      // A clearly newer active_time (more than 2s) means last_used is lagging.
+      if (bestName && !tied && Number.isFinite(lastTime) && bestTime - lastTime > 2) {
+        return { profile: bestName, reason: 'active_time' };
+      }
+      return { profile: lastUsed, reason: 'last_used' };
+    }
+    if (bestName && !tied) return { profile: bestName, reason: 'active_time' };
+
+    // With no timestamps, the only safe signal is a single open window that
+    // is also a scanned profile. Unknown open profiles make the answer ambiguous.
+    var order = Array.isArray(activity.order)
+      ? activity.order.filter(function (name) { return typeof name === 'string'; })
+      : [];
+    if (order.length === 1 && candidates.indexOf(order[0]) !== -1) {
+      return { profile: order[0], reason: 'only_open_profile' };
+    }
+    return null;
+  }
+
+  /* True when this extension is enabled in a parsed Preferences document.
+     Detection uses it to reject a profile that cannot be running the page. */
+  function extensionInstalledInPreferences(raw, extensionId) {
+    if (!isObject(raw) || typeof extensionId !== 'string' || !extensionId) return false;
+    var settings = raw.extensions && raw.extensions.settings;
+    if (!isObject(settings)) return false;
+    var entry = settings[extensionId];
+    if (!isObject(entry)) return false;
+    if (entry.state === 0) return false;
+    if (Array.isArray(entry.disable_reasons) && entry.disable_reasons.length) return false;
+    return true;
+  }
+
   /* Windows paths, POSIX paths, and file:// URLs all become a fetchable URL. */
   function toFileUrl(path) {
     if (typeof path !== 'string') return '';
@@ -890,6 +959,8 @@
     formatTimeSaved: formatTimeSaved,
     extractBraveStats: extractBraveStats,
     extractBraveProfileActivity: extractBraveProfileActivity,
+    pickBraveProfile: pickBraveProfile,
+    extensionInstalledInPreferences: extensionInstalledInPreferences,
     toFileUrl: toFileUrl,
     normalizePreferencesPath: normalizePreferencesPath,
     profileLabelFromPath: profileLabelFromPath,

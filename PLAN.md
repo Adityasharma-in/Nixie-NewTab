@@ -34,7 +34,8 @@ Weather, task due dates, toolbar badge, notifications, search-engine bangs, focu
 - [x] Calculator works in the console and the search bar; Enter copies the result; no `eval`; invalid math is ignored.
 - [x] Export produces JSON; import validates and restores settings/sites/tasks/countdowns; reset requires a second press.
 - [x] Shields rail shows live blocked/bandwidth/time totals from the active Brave profile; auto-detects, accepts a manual path, polls every 12s, and hides cleanly when disabled.
-- [x] Detection prefers the most recently active Brave profile and falls back to the highest counter; a missing/locked Preferences file shows a clear error without breaking the page.
+- [x] Detection reads only the Brave profile in use: `Local State` `last_used` and `active_time` select it, and `Secure Preferences` must list this extension. It never falls back to another profile or to the highest counter.
+- [x] If the active profile cannot be determined or read, Detect shows `ACTIVE BRAVE PROFILE NOT DETECTED` / `PREFERENCES UNREACHABLE`, clears the stored path, and leaves the rail at `NO LINK` so a poll cannot paint another profile's stats.
 - [x] Shields path stays local, is excluded from archives, and reset re-arms auto-detection.
 - [x] No regressions: keys, manifest, timer, alarm, search suggestions, and keyboard shortcuts still work.
 - [x] Works at 1440×900, 1280×800, 1024×768, 390×844, and reduced motion.
@@ -55,7 +56,8 @@ Weather, task due dates, toolbar badge, notifications, search-engine bangs, focu
 - [x] T012 — Boot integration + cross-tab storage sync.
 - [x] T013 — Syntax checks, browser smoke tests, responsive screenshots.
 - [x] T014 — Adversarial review + fixes: guarded stale offscreen APIs, cancelled path-save timers on reset/detect, invalidated in-flight polls when telemetry is switched off, and added cross-tab Shields sync.
-- [x] T015 — Final delivery summary.
+- [x] T015 — Link Shields to the active Brave profile only: per-user-data-dir `Local State` groups, `last_used` / `active_time` selection, extension-presence verification, no counter fallback, and clearing the stored path on Detect failure.
+- [x] T016 — Final delivery summary.
 
 ## Risks
 
@@ -69,7 +71,8 @@ Weather, task due dates, toolbar badge, notifications, search-engine bangs, focu
 | Seconds hidden but timer needs them | Visibility is mode-aware: clock obeys setting, timer/focus force seconds. |
 | Alarm settings not read by offscreen page | Offscreen re-reads on START_BEEP and on storage changes. |
 | T-Minus date-only event expires at midnight | Date-only events are valid through the local day; nextEvent handles this. |
-| Shields auto-detect picks an old profile with a bigger counter | Rank by `Local State` `active_time` first, then `last_used`, then counters; keep a manual path override. |
+| Shields auto-detect picks an old profile with a bigger counter | Select only the profile whose window is in use via `Local State` `last_used` / `active_time`; counters are never a tie-breaker. Reject a profile that does not list this extension in `Secure Preferences`. Keep the manual path override. |
+| Active profile is ambiguous or unreadable | Throw `ACTIVE BRAVE PROFILE NOT DETECTED` / `PREFERENCES UNREACHABLE`; clear the stored path before rendering the error so the 12s poll cannot repaint another profile. |
 | Shields path debounce races reset or Detect | Clear the pending timer on reset/Detect/Test and resync the input after reset. |
 | A poll in flight repaints the rail after telemetry is switched off | Invalidate the request token before saving the toggle and re-check `enabled` before rendering. |
 | Offscreen document outlives an extension reload with stale APIs | Guard `chrome.runtime` / `chrome.storage` listeners so the page cannot throw; direct `file://` opens are safe too. |
@@ -77,9 +80,11 @@ Weather, task due dates, toolbar badge, notifications, search-engine bangs, focu
 
 ## Verification
 
-- `node tools/test-core.js` — 38/38 passing.
+- `node tools/test-core.js` — 40/40 passing, including active-profile selection, ambiguity, extension presence, and timestamp races.
 - `node --check core.js newtab.js offscreen.js sw.js` — clean.
-- Live Brave read via `file://`: auto-detection followed the active profile. Profile 1 rendered `64,204` / `1.85 GB` / `54 MIN`; after switching to Default it rendered `170,364` / `4.70 GB` / `2.4 HRS`.
+- Live Brave read via `file://`: with `Profile 1` active, Detect linked `Profile 1` (`64,226` / `1.86 GB` / `54 MIN`) even though `Default` had a larger counter; after switching the browser window to `Default`, Detect linked `Default` (`170,373` / `4.70 GB` / `2.4 HRS`).
+- Failure modes in headless Brave: an unreadable active profile produced `PREFERENCES UNREACHABLE`; ambiguous `Local State` produced `ACTIVE BRAVE PROFILE NOT DETECTED`. Both left `NO LINK`, `—` stats, and `nixie.shields.path: ""`, then a later Detect restored the correct profile.
+- Extension-presence filter: when the active `Default` was reported as not installed, Detect refused it with `ACTIVE BRAVE PROFILE NOT DETECTED` instead of linking any other profile.
 - Checked Shields toggle off/on, invalid path error, Detect, Test Link, console `shields` commands, factory reset, cross-tab storage sync, and the date-rail layout at 1440×900, 1280×800, 1024×768, and 390×844.
 - Checked the offscreen alarm page in the extension context and as a direct `file://` open: no uncaught exceptions.
 - Browser smoke test against the local server (`localStorage` fallback).

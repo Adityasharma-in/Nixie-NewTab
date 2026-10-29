@@ -607,6 +607,67 @@ test('shields: active profile metadata identifies the profile in use', () => {
   assert.strictEqual(core.extractBraveProfileActivity({ profile: {} }), null);
 });
 
+test('shields: pickBraveProfile follows the last activated window', () => {
+  const names = ['Default', 'Profile 1'];
+  const close = { Default: 1000, 'Profile 1': 1000.5 };
+  assert.deepStrictEqual(
+    core.pickBraveProfile({ active: close, lastUsed: 'Profile 1', order: [] }, names),
+    { profile: 'Profile 1', reason: 'last_used' }
+  );
+  // Timestamps within two seconds are a write race; last_used stays in charge.
+  assert.deepStrictEqual(
+    core.pickBraveProfile({ active: close, lastUsed: 'Default', order: [] }, names),
+    { profile: 'Default', reason: 'last_used' }
+  );
+  // A clearly newer active_time beats a lagging last_used write.
+  assert.deepStrictEqual(
+    core.pickBraveProfile({ active: { Default: 1000, 'Profile 1': 1005 }, lastUsed: 'Default', order: [] }, names),
+    { profile: 'Profile 1', reason: 'active_time' }
+  );
+  // With no last_used, the unique newest activation wins.
+  assert.deepStrictEqual(
+    core.pickBraveProfile({ active: { Default: 1000, 'Profile 1': 2000 }, lastUsed: '', order: [] }, names),
+    { profile: 'Profile 1', reason: 'active_time' }
+  );
+  // The only open profile is safe even without timestamps.
+  assert.deepStrictEqual(
+    core.pickBraveProfile({ active: {}, lastUsed: '', order: ['Profile 1'] }, names),
+    { profile: 'Profile 1', reason: 'only_open_profile' }
+  );
+  // Ties and unknown profiles are ambiguous, never guessed.
+  assert.strictEqual(
+    core.pickBraveProfile({ active: { Default: 100, 'Profile 1': 100 }, lastUsed: '', order: names }, names),
+    null
+  );
+  assert.strictEqual(
+    core.pickBraveProfile({ active: {}, lastUsed: 'Guest', order: ['Guest', 'Default'] }, names),
+    null
+  );
+  assert.strictEqual(core.pickBraveProfile(null, names), null);
+  assert.strictEqual(core.pickBraveProfile({ lastUsed: 'Default' }, []), null);
+});
+
+test('shields: extension presence rejects profiles that cannot run the page', () => {
+  const doc = {
+    extensions: {
+      settings: {
+        good: { state: 1 },
+        enabledWithoutState: {},
+        disabled: { state: 0 },
+        blocked: { state: 1, disable_reasons: [1] }
+      }
+    }
+  };
+  assert.strictEqual(core.extensionInstalledInPreferences(doc, 'good'), true);
+  assert.strictEqual(core.extensionInstalledInPreferences(doc, 'enabledWithoutState'), true);
+  assert.strictEqual(core.extensionInstalledInPreferences(doc, 'disabled'), false);
+  assert.strictEqual(core.extensionInstalledInPreferences(doc, 'blocked'), false);
+  assert.strictEqual(core.extensionInstalledInPreferences(doc, 'missing'), false);
+  assert.strictEqual(core.extensionInstalledInPreferences({}, 'good'), false);
+  assert.strictEqual(core.extensionInstalledInPreferences(null, 'good'), false);
+  assert.strictEqual(core.extensionInstalledInPreferences(doc, ''), false);
+});
+
 test('shields: windows and posix paths become file URLs', () => {
   assert.strictEqual(
     core.toFileUrl('C:\\Users\\PC\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Profile 1\\Preferences'),
@@ -664,7 +725,7 @@ test('shields: chromium directory listings are parsed', () => {
 /* ---------- top-level metadata ---------- */
 
 test('metadata: version and option lists', () => {
-  assert.strictEqual(core.VERSION, '1.3.0');
+  assert.strictEqual(core.VERSION, '1.3.1');
   assert.deepStrictEqual(core.THEMES.map((theme) => theme.id),
     ['plasma', 'phosphor', 'ice', 'red']);
   assert.deepStrictEqual(core.TONES.map((tone) => tone.id),

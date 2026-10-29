@@ -1563,6 +1563,7 @@ addForm.addEventListener('submit', async (e) => {
 
 const searchForm = $('#searchForm');
 const searchInput = $('#searchInput');
+const searchEngineLabel = $('#searchEngineLabel');
 const suggestStack = $('#suggestStack');
 
 let suggestions = [];
@@ -1585,8 +1586,9 @@ function searchEngineMeta() {
 
 function updateSearchAffordance() {
   const engine = searchEngineMeta();
-  searchInput.placeholder = `Search ${engine.label}`;
+  searchInput.placeholder = 'Search the web or enter a URL';
   searchInput.setAttribute('aria-label', `Search ${engine.label}`);
+  if (searchEngineLabel) searchEngineLabel.textContent = engine.label.toUpperCase();
 }
 
 function go(url) {
@@ -1804,7 +1806,6 @@ const taskModule = $('#taskModule');
 const taskToggle = $('#taskToggle');
 const taskBody = $('#taskBody');
 const manifestCount = $('#manifestCount');
-const manifestNext = $('#manifestNext');
 const manifestPct = $('#manifestPct');
 const manifestBar = $('#manifestBar');
 const manifestGauge = $('#manifestGauge');
@@ -1932,9 +1933,6 @@ function renderChrome() {
   const { total, done, open, pct } = taskStats();
 
   manifestCount.textContent = open ? `${pad2(open)} OPEN` : total ? 'ALL CLEAR' : '00 OPEN';
-  manifestNext.textContent = open
-    ? `NEXT · ${tasks.find((task) => !task.done)?.text || ''}`
-    : total ? 'ALL WORK ORDERS CLOSED' : 'NO WORK ORDERS LOGGED — PRESS T TO ADD';
   taskModule.classList.toggle('has-open', open > 0);
   taskModule.classList.toggle('all-clear', total > 0 && open === 0);
   taskModule.classList.toggle('is-empty', total === 0);
@@ -2805,7 +2803,7 @@ function initCalibration() {
 
 const SHIELDS_KEY = 'nixie.shields';
 const SHIELDS_POLL_MS = 12000;
-const SHIELDS_MAX_CANDIDATES = 16;
+const SHIELDS_MAX_GROUPS = 16;
 
 const SHIELDS_ROOTS = [
   { root: 'file:///C:/Users/', kind: 'win' },
@@ -3070,7 +3068,7 @@ function isShieldsProfile(name) {
 }
 
 async function collectShieldsCandidates() {
-  const candidates = [];
+  const groups = [];
   const skip = /^(?:all users|default|default user|public|shared|guest|lost\+found)$/i;
 
   for (const entry of SHIELDS_ROOTS) {
@@ -3089,44 +3087,77 @@ async function collectShieldsCandidates() {
         if (!profiles.length) continue;
 
         const activity = await readShieldsProfileActivity(userDataUrl);
-        profiles.forEach((item) => {
-          candidates.push({
+        groups.push({
+          activity,
+          profiles: profiles.map((item) => ({
             path: `${userDataUrl}${encodeURIComponent(item.name)}/Preferences`,
             profile: item.name,
-            activity: activity && activity.active ? Number(activity.active[item.name]) || 0 : 0,
+            activeTime: activity && activity.active ? Number(activity.active[item.name]) || 0 : 0,
             lastUsed: !!activity && activity.lastUsed === item.name
-          });
+          }))
         });
-        if (candidates.length >= SHIELDS_MAX_CANDIDATES) break;
+        if (groups.length >= SHIELDS_MAX_GROUPS) break;
       }
-      if (candidates.length >= SHIELDS_MAX_CANDIDATES) break;
+      if (groups.length >= SHIELDS_MAX_GROUPS) break;
     }
-    if (candidates.length >= SHIELDS_MAX_CANDIDATES) break;
+    if (groups.length >= SHIELDS_MAX_GROUPS) break;
   }
 
-  return candidates.slice(0, SHIELDS_MAX_CANDIDATES);
+  return groups;
+}
+
+/* Secure Preferences lists installed extensions. A profile without this
+   extension cannot be the one that opened the page, so detection rejects it
+   even when Local State still points at it. Returns null when neither file
+   could be read, so the caller can decide whether to trust the activity data. */
+async function readShieldsExtensionState(profilePath) {
+  const dir = profilePath.replace(/[^/]+$/, '');
+  let parsed = false;
+  for (const file of ['Secure Preferences', 'Preferences']) {
+    let raw;
+    try {
+      const response = await fetch(`${dir}${encodeURIComponent(file)}`, { cache: 'no-store' });
+      if (response.status !== 200) continue;
+      raw = JSON.parse(await response.text());
+    } catch { continue; }
+    parsed = true;
+    if (CORE.extensionInstalledInPreferences(raw, chrome.runtime.id)) return true;
+  }
+  return parsed ? false : null;
 }
 
 async function detectBraveProfile() {
   if (!EXT) throw new Error('EXTENSION REQUIRED FOR FILE ACCESS');
-  const candidates = await collectShieldsCandidates();
-  if (!candidates.length) throw new Error('NO BRAVE PROFILE FOUND');
+  const groups = await collectShieldsCandidates();
+  if (!groups.length) throw new Error('NO BRAVE PROFILE FOUND');
 
-  const readable = [];
-  for (const candidate of candidates) {
-    try {
-      readable.push({ ...candidate, stats: await readShieldsPreferences(candidate.path) });
-    } catch { /* unreadable profile, keep scanning */ }
+  const picks = [];
+  for (const group of groups) {
+    const pick = CORE.pickBraveProfile(
+      group.activity,
+      group.profiles.map((item) => item.profile)
+    );
+    if (!pick) continue;
+    const candidate = group.profiles.find((item) => item.profile === pick.profile);
+    if (candidate) picks.push(candidate);
   }
+  if (!picks.length) throw new Error('ACTIVE BRAVE PROFILE NOT DETECTED');
 
-  if (!readable.length) throw new Error('BRAVE PREFERENCES COULD NOT BE READ');
-  readable.sort((a, b) => {
-    if (b.activity !== a.activity) return b.activity - a.activity;
-    if (a.lastUsed !== b.lastUsed) return a.lastUsed ? -1 : 1;
-    if (b.stats.adsBlocked !== a.stats.adsBlocked) return b.stats.adsBlocked - a.stats.adsBlocked;
-    return b.stats.bandwidthBytes - a.stats.bandwidthBytes;
-  });
-  return readable[0];
+  // Stable/Beta/Nightly each keep their own Local State; newest activation wins.
+  picks.sort((a, b) => b.activeTime - a.activeTime || (a.lastUsed ? -1 : 1));
+
+  let unverified = null;
+  for (const candidate of picks) {
+    const installed = await readShieldsExtensionState(candidate.path);
+    if (installed === true) {
+      return { ...candidate, stats: await readShieldsPreferences(candidate.path) };
+    }
+    if (installed === null && !unverified) unverified = candidate;
+  }
+  if (unverified) {
+    return { ...unverified, stats: await readShieldsPreferences(unverified.path) };
+  }
+  throw new Error('ACTIVE BRAVE PROFILE NOT DETECTED');
 }
 
 async function saveShields(patch, { note = '', noteKind = 'ok' } = {}) {
@@ -3241,7 +3272,14 @@ async function detectShieldsLink() {
     return found;
   } catch (err) {
     if (request !== shieldsRequest) return null;
-    renderShieldsError(err && err.message ? err.message : 'SHIELDS LINK FAILED', '');
+    const message = err && err.message ? err.message : 'SHIELDS LINK FAILED';
+    // A stored path that is not the active profile must not keep feeding the
+    // rail; clear it so no poll can paint another profile's stats.
+    if (shields.path) {
+      await saveShields({ path: '' });
+      if (request !== shieldsRequest) return null;
+    }
+    renderShieldsError(message, '');
     return null;
   }
 }
